@@ -25,7 +25,7 @@ import (
   "context"
 
   "github.com/kubetail-org/grpc-dispatcher"
-	"google.golang.org/grpc"
+  "google.golang.org/grpc"
 )
 
 func main() {
@@ -33,8 +33,8 @@ func main() {
   dispatcher, err := grpcdispatcher.NewDispatcher(
     "kubernetes://my-service.my-namespace",
     grpcdispatcher.WithDialOptions(
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-		),
+      grpc.WithTransportCredentials(insecure.NewCredentials()),
+    ),
   )
   if err != nil {
     return
@@ -45,9 +45,9 @@ func main() {
   dispatcher.Start()
   
   // wait until dispatcher is ready
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	dispatcher.Ready(ctx)
+  ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+  defer cancel()
+  dispatcher.Ready(ctx)
 
   // all handler contexts will inherit from this context
   rootCtx := context.Background()
@@ -55,15 +55,15 @@ func main() {
   // send query to all current grpc servers
   dispatcher.Fanout(rootCtx, func(ctx context.Context, conn *grpc.ClientConn) {
     // init grpc client
-		client := examplepb.NewExampleServiceClient(conn)
+    client := examplepb.NewExampleServiceClient(conn)
 
-		// execute grpc request
-		resp, err := client.Echo(ctx, &examplepb.EchoRequest{Message: "hello"})
-		if err != nil {
+    // execute grpc request
+    resp, err := client.Echo(ctx, &examplepb.EchoRequest{Message: "hello"})
+    if err != nil {
       // do something with error
-			fmt.Println(err)
-			return
-		}
+      fmt.Println(err)
+      return
+    }
 
     // do something with response
     fmt.Println(resp)
@@ -72,15 +72,15 @@ func main() {
   // send query to all current and future grpc servers
   sub, err := dispatcher.FanoutSubscribe(rootCtx, func(ctx context.Context, conn *grpc.ClientConn) error {
     // init grpc client
-		client := examplepb.NewExampleServiceClient(conn)
+    client := examplepb.NewExampleServiceClient(conn)
 
-		// execute grpc request
-		resp, err := client.Echo(ctx, &examplepb.EchoRequest{Message: "hello"})
-		if err != nil {
+    // execute grpc request
+    resp, err := client.Echo(ctx, &examplepb.EchoRequest{Message: "hello"})
+    if err != nil {
       // do something with error
-			fmt.Println(err)
-			return
-		}
+      fmt.Println(err)
+      return
+    }
 
     // do something with response
     fmt.Println(resp)
