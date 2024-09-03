@@ -1,0 +1,45 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: example-server
+  namespace: default
+  labels:
+    app.kubernetes.io/name: example
+    app.kubernetes.io/component: server
+spec:
+  replicas: 5
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: example
+      app.kubernetes.io/component: server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: example
+        app.kubernetes.io/component: server
+    spec:
+      containers:
+      - name: example-server
+        image: example-server
+        ports:
+        - name: grpc
+          protocol: TCP
+          containerPort: 50051
+        env:
+        - name: SERVER_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        resources: {}
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: example-server
+  namespace: default
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: example
+    app.kubernetes.io/component: server

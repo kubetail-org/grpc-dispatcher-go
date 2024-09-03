@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Example App</title>
+    <style>
+      #output {
+        margin-top: 20px;
+        height: 200px;
+        width: 600px;
+        border: 1px solid black;
+        font-family: 'Courier New', Courier, monospace;
+        overflow: auto;
+      }
+    </style>
+    <script>
+      let eventSource;
+
+      const stopEvents = () => {
+        if (eventSource && eventSource.readyState !== EventSource.CLOSED) {
+          eventSource.close();
+        }
+      }
+
+      const runExample = (endpoint) => {
+        eventSource = new EventSource(endpoint);
+        const output = document.getElementById('output');
+
+        output.innerHTML = '';
+
+        eventSource.onmessage = function(event) {
+          const el = document.createElement('div');
+          el.textContent = event.data;
+          output.appendChild(el);
+
+          if (event.data === "finished") {
+            eventSource.close();
+          }
+        };
+
+        eventSource.onerror = function(error) {
+          console.error('EventSource failed:', error);
+        };
+      }
+    </script>
+  </head>
+  <body>
+    <h1>Example App</h1>
+    <button type="button" onclick="runExample('/fanout-events')">Start Fanout Example</button>
+    <button type="button" onclick="runExample('/fanout-subscribe-events')">Start Fanout Subscribe Example</button>
+    <button type="button" onclick="stopEvents()">Stop</button>
+    <div id="output"></div>
+  </body>
+</html>
