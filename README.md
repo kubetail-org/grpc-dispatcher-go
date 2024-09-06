@@ -16,7 +16,7 @@ Try it out and let us know what you think! If you notice any bugs or have any fe
 
 First, add the library to your Go project:
 ```console
-go get github.com/kubetail-org/grpc-dispatcher
+go get github.com/kubetail-org/grpc-dispatcher-go
 ```
 
 Next write your dispatch code:
@@ -24,7 +24,7 @@ Next write your dispatch code:
 import (
   "context"
 
-  "github.com/kubetail-org/grpc-dispatcher"
+  "github.com/kubetail-org/grpc-dispatcher-go"
 	"google.golang.org/grpc"
 )
 
@@ -90,6 +90,93 @@ func main() {
   }
   defer sub.Unsubscribe()
 }
+```
+
+## Example
+
+You can see an example implementatio in the [`example/`](example/) directory.
+
+## API
+
+### NewDispatcher() - Create a new Dispatcher instance
+
+```
+NewDispatcher(opts... DispatcherOption)
+
+  * @param {string} connectUrl - Kubernetes service url
+  * @param {DispatcherOption} opts - Configuration options for dispatcher instance
+  * @returns {*Dispatcher, error} - Pointer to new dispatcher instance, nil if error
+
+Example:
+
+  dispatcher, err := grpcdispatcher.NewDispatcher(
+    "kubernetes://my-service.my-namespace",
+    grpcdispatcher.WithWithDialOptions(
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		),
+  )
+```
+
+### Dispatcher - The Dispatcher class
+
+```
+Dispatcher
+
+  Fanout(ctx context.Context, fn DispatchHandler)
+
+    * @param {context.Context} ctx - Parent object for child contexts passed to dispatch handler
+    * @param {DispatchHandler} fn - The function to be called for each available gRPC server
+
+    Example 1:
+
+      dispatcher, err := grpcdispatcher.NewDispatcher(
+        "kubernetes://my-service.my-namespace",
+        grpcdispatcher.WithWithDialOptions(
+			    grpc.WithTransportCredentials(insecure.NewCredentials()),
+		    ),
+  )
+
+  rootCtx := context.Background()
+
+  dispatcher.Fanout(rootCtx, func(ctx context.Context, conn *grpc.ClientConn) {
+    // make grpc request here
+  })
+
+
+  FanoutSubscribe(ctx context.Context, fn DispatchHandler)
+
+    * @param {context.Context} ctx - Parent object for child contexts passed to dispatch handler
+    * @param {DispatchHandler} fn - The function to be called for each available gRPC server
+    * @returns {*Subscription, error} - Pointer to new subscription, nil if error
+
+Example 2:
+
+  dispatcher, err := grpcdispatcher.NewDispatcher(
+    "kubernetes://my-service.my-namespace",
+    grpcdispatcher.WithWithDialOptions(
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		),
+  )
+
+  rootCtx, cancel := context.WithCancel(context.Background())
+
+  sub, err := dispatcher.FanoutSubscribe(rootCtx, func(ctx context.Context, conn *grpc.ClientConn) {
+    // make grpc request here
+  })
+  if err != nil {
+    return
+  }
+
+  // run for 10 seconds then stop listening for new gRPC servers
+  time.Sleep(10 * time.Second)
+
+  sub.Unsubscribe()
+
+  // let ongoing queries continue running for 10 seconds
+  time.Sleep(10 * time.Second)
+
+  // cancel ongoing requests
+  cancel()
 ```
 
 ## Develop
