@@ -4,7 +4,7 @@ gRPC-Dispatcher is a Go library that facilitates sending queries to multiple gRP
 
 ## Introduction
 
-gRPC-Dispatcher is a Go library that facilitates sending queries to multiple gRPC servers running on Kubernetes simultaneously. It simplifies the process of managing connections to gRPC servers hosted on Kubernetes pods by providing a dispatcher that keeps track of pod IP addresses behind a service and sends fanout queries to all servers simultaneously. The dispatcher supports both instantaneous fanout queries (sending queries to all currently available servers) and subscription-based fanout queries (sending queries also as new servers become available).
+gRPC-Dispatcher is a Go library that facilitates sending queries to multiple gRPC servers running on Kubernetes simultaneously. It simplifies the process of managing connections to gRPC servers hosted on Kubernetes pods by providing a dispatcher that keeps track of pod IP addresses and sends fanout queries to all servers simultaneously. The dispatcher supports both instantaneous fanout queries (sending queries to all currently available servers) and subscription-based fanout queries (sending queries also as new servers become available).
 
 Currently, the library supports gRPC servers running behind a Kubernetes service and it has the following features:
 
@@ -27,7 +27,7 @@ import (
   "context"
 
   "github.com/kubetail-org/grpc-dispatcher-go"
-	"google.golang.org/grpc"
+  "google.golang.org/grpc"
 )
 
 func main() {
