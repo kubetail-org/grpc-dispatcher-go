@@ -1,12 +1,14 @@
 # gRPC-Dispatcher
 
-gRPC-Dispatcher is a Go library for dispatching queries to multiple gRPC servers simultaneously (currently Kubernetes-only)
+gRPC-Dispatcher is a Go library that facilitates sending queries to multiple gRPC servers running on Kubernetes simultaneously
 
 ## Introduction
 
-While working on gRPC client/server communications for [Kubetail](https://github.com/kubetail-org/kubetail) we realized that we had a need for fanout-type queries to all available servers and that those types of queries weren't directly supported by the core gRPC library or by any third-party libraries we could find. So, to make it easier to implement these types of queries, we created gRPC-Dispatcher. Currently, the library supports gRPC servers running behind a Kubernetes service and it has the following features:
+gRPC-Dispatcher is a Go library that facilitates sending queries to multiple gRPC servers running on Kubernetes simultaneously. It simplifies the process of managing connections to gRPC servers hosted on Kubernetes pods by providing a dispatcher that keeps track of pod IP addresses behind a service and sends fanout queries to all servers simultaneously. The dispatcher supports both instantaneous fanout queries (sending queries to all currently available servers) and subscription-based fanout queries (sending queries also as new servers become available).
 
-* Uses Kubernetes API to get server ips and watch for changes in realtime
+Currently, the library supports gRPC servers running behind a Kubernetes service and it has the following features:
+
+* Uses Kubernetes API to get pod IPs using highly efficient EndpointSlices
 * Connects to new servers eagerly in background so new queries are instantaneous
 * Supports long-running streaming queries to ephemeral servers
 
@@ -16,7 +18,7 @@ Try it out and let us know what you think! If you notice any bugs or have any fe
 
 First, add the library to your Go project:
 ```console
-go get github.com/kubetail-org/grpc-dispatcher
+go get github.com/kubetail-org/grpc-dispatcher-go
 ```
 
 Next write your dispatch code:
@@ -24,8 +26,8 @@ Next write your dispatch code:
 import (
   "context"
 
-  "github.com/kubetail-org/grpc-dispatcher"
-  "google.golang.org/grpc"
+  "github.com/kubetail-org/grpc-dispatcher-go"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -91,6 +93,17 @@ func main() {
   defer sub.Unsubscribe()
 }
 ```
+
+> [!IMPORTANT]
+> gRPC-Dispatcher needs `list` and `watch` permisions for the `endpointslices` resource in the Kubernetes API
+
+## Docs
+
+See [Go docs](https://pkg.go.dev/github.com/kubetail-org/grpc-dispatcher-go) for library documentation.
+
+## Example
+
+You can see an example implementation in the [`example/`](example/) directory. To run the example in a Kubernetes environment see the [Develop](#Develop) section below. 
 
 ## Develop
 
