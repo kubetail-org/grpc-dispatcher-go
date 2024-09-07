@@ -103,7 +103,7 @@ See [Go docs](https://pkg.go.dev/github.com/kubetail-org/grpc-dispatcher-go) for
 
 ## Example
 
-You can see an example implementation in the [`example/`](example/) directory. To run the example in a Kubernetes environment see the #Develop section below. 
+You can see an example implementation in the [`example/`](example/) directory. To run the example in a Kubernetes environment see the [Develop](#Develop) section below. 
 
 ## Develop
 
