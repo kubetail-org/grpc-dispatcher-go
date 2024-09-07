@@ -94,7 +94,7 @@ func main() {
 }
 ```
 
-> [!TIP]
+> [!IMPORTANT]
 > gRPC-Dispatcher needs `list` and `watch` permisions for the `endpointslices` resource in the Kubernetes API
 
 ## Docs
