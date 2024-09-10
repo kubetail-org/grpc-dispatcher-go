@@ -25,8 +25,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	grpcdispatcher "github.com/kubetail-org/grpc-dispatcher-go"
-	"github.com/kubetail-org/grpc-dispatcher-go/example/internal/examplepb"
+	grpcdispatcher "github.com/kubetail-org/grpc-dispatcher"
+	"github.com/kubetail-org/grpc-dispatcher/example/internal/examplepb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )

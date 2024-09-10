@@ -1,4 +1,4 @@
-module github.com/kubetail-org/grpc-dispatcher-go
+module github.com/kubetail-org/grpc-dispatcher
 
 go 1.22.5
 

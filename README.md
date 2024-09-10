@@ -18,7 +18,7 @@ Try it out and let us know what you think! If you notice any bugs or have any fe
 
 First, add the library to your Go project:
 ```console
-go get github.com/kubetail-org/grpc-dispatcher-go
+go get github.com/kubetail-org/grpc-dispatcher
 ```
 
 Next write your dispatch code:
@@ -26,7 +26,7 @@ Next write your dispatch code:
 import (
   "context"
 
-  "github.com/kubetail-org/grpc-dispatcher-go"
+  "github.com/kubetail-org/grpc-dispatcher"
   "google.golang.org/grpc"
 )
 
@@ -99,7 +99,7 @@ func main() {
 
 ## Docs
 
-See [Go docs](https://pkg.go.dev/github.com/kubetail-org/grpc-dispatcher-go) for library documentation.
+See [Go docs](https://pkg.go.dev/github.com/kubetail-org/grpc-dispatcher) for library documentation.
 
 ## Example
 
