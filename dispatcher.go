@@ -189,7 +189,6 @@ func (d *Dispatcher) Start() {
 	// start informer and connect subconns
 	d.stopCh = make(chan struct{})
 	go d.informer.Run(d.stopCh)
-	d.conn.Connect()
 }
 
 // Wait until informer has synced with Kubernetes API
@@ -254,9 +253,6 @@ func (d *Dispatcher) updateState(toAdd []string, toDelete []string) {
 	}
 
 	d.resolver.UpdateState(resolver.State{Addresses: addrs})
-
-	// initialize new connections in background
-	d.conn.Connect()
 
 	d.mu.Unlock()
 
@@ -325,6 +321,9 @@ func NewDispatcher(connectUrl string, options ...DispatcherOption) (*Dispatcher,
 	if err != nil {
 		return nil, err
 	}
+
+	// eager connect
+	conn.Connect()
 
 	return &Dispatcher{
 		opts:        opts,

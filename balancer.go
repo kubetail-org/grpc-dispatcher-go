@@ -30,7 +30,7 @@ func (p *picker) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
 	wantIp := info.Ctx.Value(dispatcherAddrCtxKey).(string)
 	sc, exists := p.subConns[wantIp]
 	if !exists {
-		return balancer.PickResult{}, fmt.Errorf("ip not found: %s", wantIp)
+		return balancer.PickResult{}, fmt.Errorf("subconn for ip %s not ready", wantIp)
 	}
 	return balancer.PickResult{SubConn: sc}, nil
 }
