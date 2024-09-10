@@ -23,7 +23,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/kubetail-org/grpc-dispatcher-go/example/internal/app"
+	"github.com/kubetail-org/grpc-dispatcher/example/internal/app"
 )
 
 func main() {
