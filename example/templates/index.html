@@ -5,8 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Example App</title>
     <style>
-      #output {
-        margin-top: 20px;
+      h2 {
+        padding: 0;
+        margin: 30px 0 5px;
+      }
+
+      .output {
+        margin-top: 10px;
         height: 200px;
         width: 600px;
         border: 1px solid black;
@@ -15,17 +20,9 @@
       }
     </style>
     <script>
-      let eventSource;
-
-      const stopEvents = () => {
-        if (eventSource && eventSource.readyState !== EventSource.CLOSED) {
-          eventSource.close();
-        }
-      }
-
-      const runExample = (endpoint) => {
-        eventSource = new EventSource(endpoint);
-        const output = document.getElementById('output');
+      const runFanoutExample = () => {
+        const eventSource = new EventSource('/fanout-events');
+        const output = document.getElementById('fanout-example-output');
 
         output.innerHTML = '';
 
@@ -40,16 +37,48 @@
         };
 
         eventSource.onerror = function(error) {
-          console.error('EventSource failed:', error);
+          console.error('Fanout Example EventSource failed:', error);
+        };
+      };
+
+      let subscriptionES;
+
+      const startFanoutSubscribeExample = () => {
+        subscriptionES = new EventSource('/fanout-subscribe-events');
+        const output = document.getElementById('fanout-subscribe-output');
+
+        output.innerHTML = '';
+
+        subscriptionES.onmessage = function(event) {
+          const el = document.createElement('div');
+          el.textContent = event.data;
+          output.appendChild(el);
+
+          if (event.data === "finished") {
+            subscriptionES.close();
+          }
+        };
+
+        subscriptionES.onerror = function(error) {
+          console.error('Fanout Subscribe Example EventSource failed:', error);
         };
       }
-    </script>
+
+      const stopFanoutSubscribeExample = () => {
+        if (subscriptionES && subscriptionES.readyState !== EventSource.CLOSED) {
+          subscriptionES.close();
+        }
+      }
+</script>
   </head>
   <body>
     <h1>Example App</h1>
-    <button type="button" onclick="runExample('/fanout-events')">Start Fanout Example</button>
-    <button type="button" onclick="runExample('/fanout-subscribe-events')">Start Fanout Subscribe Example</button>
-    <button type="button" onclick="stopEvents()">Stop</button>
-    <div id="output"></div>
+    <h2>Fanout Example:</h2>
+    <button type="button" onclick="runFanoutExample()">Run</button>
+    <div id="fanout-example-output" class="output"></div>
+    <h2>Fanout Subscribe Example:</h2>
+    <button type="button" onclick="startFanoutSubscribeExample()">Start</button>
+    <button type="button" onclick="stopFanoutSubscribeExample()">Stop</button>
+    <div id="fanout-subscribe-output" class="output"></div>
   </body>
 </html>

@@ -67,4 +67,9 @@ spec:
         - name: http
           protocol: TCP
           containerPort: 4000
+        #env:
+        #- name: GRPC_GO_LOG_SEVERITY_LEVEL
+        #  value: "INFO"
+        #- name: GRPC_GO_LOG_VERBOSITY_LEVEL
+        #  value: "2"
         resources: {}

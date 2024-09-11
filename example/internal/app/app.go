@@ -25,8 +25,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	grpcdispatcher "github.com/kubetail-org/grpc-dispatcher"
-	"github.com/kubetail-org/grpc-dispatcher/example/internal/examplepb"
+	grpcdispatcher "github.com/kubetail-org/grpc-dispatcher-go"
+	"github.com/kubetail-org/grpc-dispatcher-go/example/internal/examplepb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -99,7 +99,7 @@ func NewApp() (*App, error) {
 			// execute grpc request
 			resp, err := client.Echo(ctx, &examplepb.EchoRequest{Message: "hello", DurationMs: 0})
 			if err != nil {
-				fmt.Println(err)
+				log.Printf("Error: %v", err)
 				return
 			}
 
@@ -135,7 +135,7 @@ func NewApp() (*App, error) {
 			// execute grpc request
 			resp, err := client.Echo(ctx, &examplepb.EchoRequest{Message: "hello", DurationMs: 0})
 			if err != nil {
-				fmt.Println(err)
+				log.Printf("Error: %v", err)
 				return
 			}
 

@@ -83,10 +83,10 @@ spec:
       - name: chaoskube
         image: ghcr.io/linki/chaoskube:v0.31.0
         args:
-        - --interval=2m
+        - --interval=30s
         - --labels=app.kubernetes.io/name=example,app.kubernetes.io/component=server
         - --namespaces=default
-        - --minimum-age=4m
+        - --minimum-age=0s
         - --no-dry-run
         securityContext:
           runAsNonRoot: true
