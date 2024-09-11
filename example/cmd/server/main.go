@@ -26,7 +26,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/kubetail-org/grpc-dispatcher/example/internal/examplepb"
+	"github.com/kubetail-org/grpc-dispatcher-go/example/internal/examplepb"
 )
 
 type ExampleService struct {
