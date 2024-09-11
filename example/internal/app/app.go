@@ -99,7 +99,7 @@ func NewApp() (*App, error) {
 			// execute grpc request
 			resp, err := client.Echo(ctx, &examplepb.EchoRequest{Message: "hello", DurationMs: 0})
 			if err != nil {
-				fmt.Println(err)
+				log.Printf("Error: %v", err)
 				return
 			}
 
@@ -135,7 +135,7 @@ func NewApp() (*App, error) {
 			// execute grpc request
 			resp, err := client.Echo(ctx, &examplepb.EchoRequest{Message: "hello", DurationMs: 0})
 			if err != nil {
-				fmt.Println(err)
+				log.Printf("Error: %v", err)
 				return
 			}
 

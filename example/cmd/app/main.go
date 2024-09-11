@@ -35,7 +35,7 @@ func main() {
 	// create app
 	app, err := app.NewApp()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error: %v", err)
 	}
 
 	// create server
@@ -51,7 +51,7 @@ func main() {
 	go func() {
 		log.Println("Starting server on :4000")
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatal(err)
+			log.Fatalf("Error: %v", err)
 		}
 	}()
 
@@ -68,7 +68,7 @@ func main() {
 	done := make(chan struct{})
 	go func() {
 		if err := server.Shutdown(ctx); err != nil {
-			log.Println(err)
+			log.Printf("Error: %v", err)
 		}
 		close(done)
 	}()
