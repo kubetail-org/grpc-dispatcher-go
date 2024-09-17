@@ -348,7 +348,10 @@ func parseConnectUrl(connectUrl string) (*connectArgs, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	fmt.Println("host")
+	fmt.Println(u.Host)
+	fmt.Println(u.Port())
+	fmt.Println("port")
 	parts := strings.Split(u.Host, ".")
 
 	serviceName := parts[0]
