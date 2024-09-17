@@ -55,7 +55,7 @@ func TestParseConnectUrl(t *testing.T) {
 			"50051",
 		},
 		{
-			"custom port",
+			"custom port number",
 			"kubernetes://my-service.my-namespace:1234",
 			"my-namespace",
 			"my-service",
