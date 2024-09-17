@@ -29,13 +29,49 @@ import (
 const testCtxKey key = "testkey"
 
 func newTestDispatcher() *Dispatcher {
-	d, _ := NewDispatcher("kubernetes://my-service.my-namespace",
+	d, _ := NewDispatcher(
+		"kubernetes://my-service.my-namespace",
 		WithKubernetesClientset(fake.NewSimpleClientset()),
 		WithDialOptions(
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 		),
 	)
 	return d
+}
+
+func TestParseConnectUrl(t *testing.T) {
+	tests := []struct {
+		name            string
+		setUrl          string
+		wantNamespace   string
+		wantServiceName string
+		wantPort        string
+	}{
+		{
+			"default port",
+			"kubernetes://my-service.my-namespace",
+			"my-namespace",
+			"my-service",
+			"50051",
+		},
+		{
+			"custom port number",
+			"kubernetes://my-service.my-namespace:1234",
+			"my-namespace",
+			"my-service",
+			"1234",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			args, err := parseConnectUrl(tt.setUrl)
+			require.Nil(t, err)
+			require.Equal(t, tt.wantNamespace, args.Namespace)
+			require.Equal(t, tt.wantServiceName, args.ServiceName)
+			require.Equal(t, tt.wantPort, args.Port)
+		})
+	}
 }
 
 func TestDispatcherUpdateState(t *testing.T) {

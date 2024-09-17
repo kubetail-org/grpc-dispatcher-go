@@ -349,7 +349,7 @@ func parseConnectUrl(connectUrl string) (*connectArgs, error) {
 		return nil, err
 	}
 
-	parts := strings.Split(u.Host, ".")
+	parts := strings.Split(u.Hostname(), ".")
 
 	serviceName := parts[0]
 
