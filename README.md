@@ -54,6 +54,44 @@ func main() {
   // all handler contexts will inherit from this context
   rootCtx := context.Background()
   
+  // send query to one grpc server
+  dispatcher.Unicast(rootCtx, "node-name", func(ctx context.Context, conn *grpc.ClientConn) {
+    // init grpc client
+    client := examplepb.NewExampleServiceClient(conn)
+
+    // execute grpc request
+    resp, err := client.Echo(ctx, &examplepb.EchoRequest{Message: "hello"})
+    if err != nil {
+      // do something with error
+      fmt.Println(err)
+      return
+    }
+
+    // do something with response
+    fmt.Println(resp)    
+  })
+
+  // send query to one grpc server and future servers at same node
+  unicastSub, err := dispatcher.UnicastSubscribe(rootCtx, "node-name", func(ctx context.Context, conn *grpc.ClientConn) error {
+    // init grpc client
+    client := examplepb.NewExampleServiceClient(conn)
+
+    // execute grpc request
+    resp, err := client.Echo(ctx, &examplepb.EchoRequest{Message: "hello"})
+    if err != nil {
+      // do something with error
+      fmt.Println(err)
+      return
+    }
+
+    // do something with response
+    fmt.Println(resp)
+  })
+  if err != nil {
+    panic(err)
+  }
+  defer unicastSub.Unsubscribe()
+
   // send query to all current grpc servers
   dispatcher.Fanout(rootCtx, func(ctx context.Context, conn *grpc.ClientConn) {
     // init grpc client
@@ -72,7 +110,7 @@ func main() {
   })
   
   // send query to all current and future grpc servers
-  sub, err := dispatcher.FanoutSubscribe(rootCtx, func(ctx context.Context, conn *grpc.ClientConn) error {
+  fanoutSub, err := dispatcher.FanoutSubscribe(rootCtx, func(ctx context.Context, conn *grpc.ClientConn) error {
     // init grpc client
     client := examplepb.NewExampleServiceClient(conn)
 
@@ -90,7 +128,7 @@ func main() {
   if err != nil {
     panic(err)
   }
-  defer sub.Unsubscribe()
+  defer fanoutSub.Unsubscribe()
 }
 ```
 

@@ -84,6 +84,28 @@ type Dispatcher struct {
 	stopCh      chan struct{}
 }
 
+// Sends query to matching server at query-time
+func (d *Dispatcher) Unicast(ctx context.Context, serverName string, fn DispatchHandler) {
+	doneCh := make(chan struct{})
+	go func() {
+		defer close(doneCh)
+		connCtx := context.WithValue(ctx, dispatcherAddrCtxKey, fmt.Sprintf("%s:%s", serverName, d.connectArgs.Port))
+		fn(connCtx, d.conn)
+	}()
+
+	// wait for func or ctx to finish whichever comes first
+	select {
+	case <-ctx.Done():
+	case <-doneCh:
+	}
+}
+
+// Sends query to matching server at query-time and all subsequent servers when
+// they become available until Unsubscribe() is called
+func (d *Dispatcher) UnicastSubscribe(ctx context.Context, serverName string, fn DispatchHandler) (*Subscription, error) {
+	panic("not implemented")
+}
+
 // Sends queries to all available ips at query-time
 func (d *Dispatcher) Fanout(ctx context.Context, fn DispatchHandler) {
 	var wg sync.WaitGroup

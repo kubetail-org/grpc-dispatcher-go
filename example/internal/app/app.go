@@ -74,6 +74,88 @@ func NewApp() (*App, error) {
 		c.HTML(http.StatusOK, "index.html", nil)
 	})
 
+	// handle for unicast example
+	app.GET("/unicast-events", func(c *gin.Context) {
+		c.Header("Content-Type", "text/event-stream")
+		c.Header("Cache-Control", "no-cache")
+		c.Header("Connection", "keep-alive")
+
+		rootCtx := c.Request.Context()
+
+		var mu sync.Mutex
+		sendMsg := func(msg string) {
+			mu.Lock()
+			defer mu.Unlock()
+			if rootCtx.Err() == nil {
+				c.SSEvent("message", msg)
+				c.Writer.Flush()
+			}
+		}
+
+		fmt.Println(c.Query("server-name"))
+
+		app.dispatcher.Unicast(rootCtx, c.Query("server-name"), func(ctx context.Context, conn *grpc.ClientConn) {
+			// init grpc client
+			client := examplepb.NewExampleServiceClient(conn)
+
+			// execute grpc request
+			resp, err := client.Echo(ctx, &examplepb.EchoRequest{Message: "hello", DurationMs: 0})
+			if err != nil {
+				log.Printf("Error: %v", err)
+				return
+			}
+
+			// send response to browser
+			sendMsg(fmt.Sprintf("%s: %s\n", resp.ServerName, resp.Message))
+		})
+
+		sendMsg("finished")
+
+	})
+
+	// handler for unicast subscribe example
+	app.GET("/unicast-subscribe-events", func(c *gin.Context) {
+		c.Header("Content-Type", "text/event-stream")
+		c.Header("Cache-Control", "no-cache")
+		c.Header("Connection", "keep-alive")
+
+		rootCtx := c.Request.Context()
+
+		var mu sync.Mutex
+		sendMsg := func(msg string) {
+			mu.Lock()
+			defer mu.Unlock()
+			if rootCtx.Err() == nil {
+				c.SSEvent("message", msg)
+				c.Writer.Flush()
+			}
+		}
+
+		fmt.Println(c.Query("server-name"))
+
+		sub, err := app.dispatcher.UnicastSubscribe(rootCtx, c.Query("server-name"), func(ctx context.Context, conn *grpc.ClientConn) {
+			// init grpc client
+			client := examplepb.NewExampleServiceClient(conn)
+
+			// execute grpc request
+			resp, err := client.Echo(ctx, &examplepb.EchoRequest{Message: "hello", DurationMs: 0})
+			if err != nil {
+				log.Printf("Error: %v", err)
+				return
+			}
+
+			// send response to browser
+			sendMsg(fmt.Sprintf("%s: %s\n", resp.ServerName, resp.Message))
+		})
+		if err != nil {
+			sendMsg(err.Error())
+			return
+		}
+		defer sub.Unsubscribe()
+
+		<-c.Writer.CloseNotify()
+	})
+
 	// handle for fanout example
 	app.GET("/fanout-events", func(c *gin.Context) {
 		c.Header("Content-Type", "text/event-stream")
