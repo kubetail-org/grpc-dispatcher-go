@@ -75,31 +75,40 @@ func TestParseConnectUrl(t *testing.T) {
 }
 
 func TestDispatcherUpdateState(t *testing.T) {
-	initialIps := []string{"ip1", "ip2"}
+	initialServers := []server{{"ip1", "n1"}, {"ip2", "n2"}}
 
 	tests := []struct {
 		name        string
-		setToAdd    []string
-		setToDelete []string
-		wantIps     mapset.Set[string]
+		setToAdd    []server
+		setToDelete []server
+		wantServers mapset.Set[server]
 	}{
 		{
 			"add ips",
-			[]string{"ip3", "ip4"},
-			[]string{},
-			mapset.NewSet("ip1", "ip2", "ip3", "ip4"),
+			[]server{{"ip3", "n3"}, {"ip4", "n4"}},
+			[]server{},
+			mapset.NewSet(
+				server{"ip1", "n1"},
+				server{"ip2", "n2"},
+				server{"ip3", "n3"},
+				server{"ip4", "n4"},
+			),
 		},
 		{
 			"delete ips",
-			[]string{},
-			[]string{"ip2"},
-			mapset.NewSet("ip1"),
+			[]server{},
+			[]server{{"ip2", "n2"}},
+			mapset.NewSet(server{"ip1", "n1"}),
 		},
 		{
 			"add and delete ips",
-			[]string{"ip3", "ip4"},
-			[]string{"ip2"},
-			mapset.NewSet("ip1", "ip3", "ip4"),
+			[]server{{"ip3", "n3"}, {"ip4", "n4"}},
+			[]server{{"ip2", "n2"}},
+			mapset.NewSet(
+				server{"ip1", "n1"},
+				server{"ip3", "n3"},
+				server{"ip4", "n4"},
+			),
 		},
 	}
 
@@ -107,24 +116,94 @@ func TestDispatcherUpdateState(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// initialize dispatcher
 			d := newTestDispatcher()
-			d.updateState(initialIps, nil)
+			d.updateState(initialServers, nil)
 
 			// apply update
 			d.updateState(tt.setToAdd, tt.setToDelete)
 
 			// check result
-			require.Equal(t, tt.wantIps, d.ips)
+			require.Equal(t, tt.wantServers, d.servers)
 		})
 	}
 }
 
+func TestDispatcherUnicast(t *testing.T) {
+	setServers := []server{{"ip1", "n1"}, {"ip2", "n2"}}
+	wantIps := mapset.NewSet("ip1:50051")
+
+	// initialize dispatcher
+	d := newTestDispatcher()
+	d.updateState(setServers, nil)
+
+	rootCtx := context.WithValue(context.Background(), testCtxKey, "yyy")
+
+	// execute unicast query
+	var mu sync.Mutex
+	ips := []string{}
+	d.Unicast(rootCtx, "n1", func(ctx context.Context, clientconn *grpc.ClientConn) {
+		// check context inheritance
+		ctxVal := ctx.Value(testCtxKey).(string)
+		require.Equal(t, "yyy", ctxVal)
+
+		// add ip to results
+		ip := ctx.Value(dispatcherAddrCtxKey).(string)
+		mu.Lock()
+		ips = append(ips, ip)
+		mu.Unlock()
+	})
+
+	// check result
+	require.Equal(t, wantIps, mapset.NewSet(ips...))
+}
+
+func TestDispatcherUnicastSubscribe(t *testing.T) {
+	setInitialServers := []server{{"ip1A", "n1"}, {"ip2", "n2"}}
+	wantIps := mapset.NewSet("ip1A:50051", "ip1B:50051")
+
+	// initialize dispatcher
+	d := newTestDispatcher()
+	d.updateState(setInitialServers, nil)
+
+	rootCtx := context.WithValue(context.Background(), testCtxKey, "yyy")
+
+	// execute fanout query
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	wg.Add(2)
+
+	ips := []string{}
+	sub, err := d.UnicastSubscribe(rootCtx, "n1", func(ctx context.Context, clientconn *grpc.ClientConn) {
+		defer wg.Done()
+		// check context inheritance
+		ctxVal := ctx.Value(testCtxKey).(string)
+		require.Equal(t, "yyy", ctxVal)
+
+		// add ip to results
+		ip := ctx.Value(dispatcherAddrCtxKey).(string)
+		mu.Lock()
+		ips = append(ips, ip)
+		mu.Unlock()
+	})
+	require.Nil(t, err)
+	defer sub.Unsubscribe()
+
+	// add another ip after subscription has started
+	d.updateState([]server{{"ip1B", "n1"}}, nil)
+
+	wg.Wait()
+
+	// check result
+	require.Equal(t, wantIps, mapset.NewSet(ips...))
+}
+
 func TestDispatcherFanout(t *testing.T) {
-	setIps := []string{"ip1", "ip2"}
+	setServers := []server{{"ip1", "n1"}, {"ip2", "n2"}}
 	wantIps := mapset.NewSet("ip1:50051", "ip2:50051")
 
 	// initialize dispatcher
 	d := newTestDispatcher()
-	d.updateState(setIps, nil)
+	d.updateState(setServers, nil)
 
 	rootCtx := context.WithValue(context.Background(), testCtxKey, "yyy")
 
@@ -148,12 +227,12 @@ func TestDispatcherFanout(t *testing.T) {
 }
 
 func TestDispatcherFanoutSubscribe(t *testing.T) {
-	setInitialIps := []string{"ip1", "ip2"}
+	setInitialServers := []server{{"ip1", "n1"}, {"ip2", "n2"}}
 	wantIps := mapset.NewSet("ip1:50051", "ip2:50051", "ip3:50051")
 
 	// initialize dispatcher
 	d := newTestDispatcher()
-	d.updateState(setInitialIps, nil)
+	d.updateState(setInitialServers, nil)
 
 	rootCtx := context.WithValue(context.Background(), testCtxKey, "yyy")
 
@@ -180,7 +259,7 @@ func TestDispatcherFanoutSubscribe(t *testing.T) {
 	defer sub.Unsubscribe()
 
 	// add another ip after subscription has started
-	d.updateState([]string{"ip3"}, nil)
+	d.updateState([]server{{"ip3", "n3"}}, nil)
 
 	wg.Wait()
 

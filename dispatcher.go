@@ -125,8 +125,55 @@ func (d *Dispatcher) Unicast(ctx context.Context, nodeName string, fn DispatchHa
 
 // Sends query to matching server at query-time and all subsequent servers when
 // they become available until Unsubscribe() is called
-func (d *Dispatcher) UnicastSubscribe(ctx context.Context, serverName string, fn DispatchHandler) (*Subscription, error) {
-	panic("not implemented")
+func (d *Dispatcher) UnicastSubscribe(ctx context.Context, nodeName string, fn DispatchHandler) (*Subscription, error) {
+	serverCh := make(chan server)
+
+	// server handler
+	handleNewServers := func(newServers []server) {
+		for _, server := range newServers {
+			if server.nodeName == nodeName {
+				serverCh <- server
+			}
+		}
+	}
+
+	// worker
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case server, ok := <-serverCh:
+				if !ok {
+					// unsubscribe was called
+					return
+				}
+
+				// execute dispatch handler in goroutine
+				connCtx := context.WithValue(ctx, dispatcherAddrCtxKey, fmt.Sprintf("%s:%s", server.ip, d.connectArgs.Port))
+				go fn(connCtx, d.conn)
+			}
+		}
+	}()
+
+	// get current ips and subscribe to new ones in a lock
+	d.mu.Lock()
+	currentServers := d.servers.ToSlice()
+	err := d.eventbus.SubscribeAsync("add:servers", handleNewServers, false)
+	if err != nil {
+		d.mu.Unlock()
+		return nil, err
+	}
+	d.mu.Unlock()
+
+	handleNewServers(currentServers)
+
+	return &Subscription{
+		serverCh: serverCh,
+		cleanup: func() {
+			d.eventbus.Unsubscribe("add:servers", handleNewServers)
+		},
+	}, nil
 }
 
 // Sends queries to all available ips at query-time
