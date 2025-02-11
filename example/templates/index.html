@@ -20,6 +20,58 @@
       }
     </style>
     <script>
+      const runUnicastExample = (form) => {
+        const nodeName = form['node-name'].value;
+        const eventSource = new EventSource(`/unicast-events?node-name=${encodeURIComponent(nodeName)}`);
+        const output = document.getElementById('unicast-example-output');
+
+        output.innerHTML = '';
+
+        eventSource.onmessage = function(event) {
+          const el = document.createElement('div');
+          el.textContent = event.data;
+          output.appendChild(el);
+
+          if (event.data === "finished") {
+            eventSource.close();
+          }
+        };
+
+        eventSource.onerror = function(error) {
+          console.error('Unicast Example EventSource failed:', error);
+        };
+      };
+
+      let subscriptionUnicastES;
+
+      const startUnicastSubscribeExample = (form) => {
+        const nodeName = form['node-name'].value;
+        subscriptionUnicastES = new EventSource(`/unicast-subscribe-events?node-name=${encodeURIComponent(nodeName)}`);
+        const output = document.getElementById('unicast-subscribe-output');
+
+        output.innerHTML = '';
+
+        subscriptionUnicastES.onmessage = function(event) {
+          const el = document.createElement('div');
+          el.textContent = event.data;
+          output.appendChild(el);
+
+          if (event.data === "finished") {
+            subscriptionUnicastES.close();
+          }
+        };
+
+        subscriptionUnicastES.onerror = function(error) {
+          console.error('Fanout Subscribe Example EventSource failed:', error);
+        };
+      }
+
+      const stopUnicastSubscribeExample = () => {
+        if (subscriptionUnicastES && subscriptionUnicastES.readyState !== EventSource.CLOSED) {
+          subscriptionUnicastES.close();
+        }
+      }
+
       const runFanoutExample = () => {
         const eventSource = new EventSource('/fanout-events');
         const output = document.getElementById('fanout-example-output');
@@ -41,38 +93,51 @@
         };
       };
 
-      let subscriptionES;
+      let subscriptionFanoutES;
 
       const startFanoutSubscribeExample = () => {
-        subscriptionES = new EventSource('/fanout-subscribe-events');
+        subscriptionFanoutES = new EventSource('/fanout-subscribe-events');
         const output = document.getElementById('fanout-subscribe-output');
 
         output.innerHTML = '';
 
-        subscriptionES.onmessage = function(event) {
+        subscriptionFanoutES.onmessage = function(event) {
           const el = document.createElement('div');
           el.textContent = event.data;
           output.appendChild(el);
 
           if (event.data === "finished") {
-            subscriptionES.close();
+            subscriptionFanoutES.close();
           }
         };
 
-        subscriptionES.onerror = function(error) {
+        subscriptionFanoutES.onerror = function(error) {
           console.error('Fanout Subscribe Example EventSource failed:', error);
         };
       }
 
       const stopFanoutSubscribeExample = () => {
-        if (subscriptionES && subscriptionES.readyState !== EventSource.CLOSED) {
-          subscriptionES.close();
+        if (subscriptionFanoutES && subscriptionFanoutES.readyState !== EventSource.CLOSED) {
+          subscriptionFanoutES.close();
         }
       }
-</script>
+    </script>
   </head>
   <body>
     <h1>Example App</h1>
+    <h2>Unicast Example:</h2>
+    <form onsubmit="runUnicastExample(this); return false;">
+      <input type="text" name="node-name" placeholder="Node name...">
+      <button type="submit">Run</button>
+    </form>
+    <div id="unicast-example-output" class="output"></div>
+    <h2>Unicast Subscribe Example:</h2>
+    <form onsubmit="startUnicastSubscribeExample(this); return false;">
+      <input type="text" name="node-name" placeholder="Node name...">
+      <button type="submit">Start</button>
+      <button type="button" onclick="stopUnicastSubscribeExample()">Stop</button>
+    </form>
+    <div id="unicast-subscribe-output" class="output"></div>
     <h2>Fanout Example:</h2>
     <button type="button" onclick="runFanoutExample()">Run</button>
     <div id="fanout-example-output" class="output"></div>
