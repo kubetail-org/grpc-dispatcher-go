@@ -53,18 +53,24 @@ func init() {
 	balancer.Register(builder)
 }
 
+// Represents gRPC server internally
+type server struct {
+	ip       string
+	nodeName string
+}
+
 // Represents the callback argument to the dispatch methods
 type DispatchHandler func(ctx context.Context, conn *grpc.ClientConn)
 
 // Represents interest in pod ips that are part of a Kubernetes service
 type Subscription struct {
-	ipCh    chan string
-	cleanup func()
+	serverCh chan server
+	cleanup  func()
 }
 
 // Ends subscription
 func (sub *Subscription) Unsubscribe() {
-	close(sub.ipCh)
+	close(sub.serverCh)
 	sub.cleanup()
 }
 
@@ -78,18 +84,35 @@ type Dispatcher struct {
 	informerReg cache.ResourceEventHandlerRegistration
 	resolver    *manual.Resolver
 	conn        *grpc.ClientConn
-	ips         mapset.Set[string]
+	servers     mapset.Set[server]
 	mu          sync.Mutex
 	eventbus    eventbus.Bus
 	stopCh      chan struct{}
 }
 
 // Sends query to matching server at query-time
-func (d *Dispatcher) Unicast(ctx context.Context, serverName string, fn DispatchHandler) {
+func (d *Dispatcher) Unicast(ctx context.Context, nodeName string, fn DispatchHandler) {
+	d.mu.Lock()
+	currentServers := d.servers.ToSlice()
+	d.mu.Unlock()
+
+	// Get ip for a server at `nodeName`
+	var ip string
+	for _, server := range currentServers {
+		if server.nodeName == nodeName {
+			ip = server.ip
+		}
+	}
+
+	// Exit if server not found
+	if ip == "" {
+		return
+	}
+
 	doneCh := make(chan struct{})
 	go func() {
 		defer close(doneCh)
-		connCtx := context.WithValue(ctx, dispatcherAddrCtxKey, fmt.Sprintf("%s:%s", serverName, d.connectArgs.Port))
+		connCtx := context.WithValue(ctx, dispatcherAddrCtxKey, fmt.Sprintf("%s:%s", ip, d.connectArgs.Port))
 		fn(connCtx, d.conn)
 	}()
 
@@ -111,11 +134,11 @@ func (d *Dispatcher) Fanout(ctx context.Context, fn DispatchHandler) {
 	var wg sync.WaitGroup
 
 	d.mu.Lock()
-	ips := d.ips.ToSlice()
+	servers := d.servers.ToSlice()
 	d.mu.Unlock()
 
-	for _, ip := range ips {
-		connCtx := context.WithValue(ctx, dispatcherAddrCtxKey, fmt.Sprintf("%s:%s", ip, d.connectArgs.Port))
+	for _, server := range servers {
+		connCtx := context.WithValue(ctx, dispatcherAddrCtxKey, fmt.Sprintf("%s:%s", server.ip, d.connectArgs.Port))
 		wg.Add(1)
 		go func(lclCtx context.Context) {
 			defer wg.Done()
@@ -139,12 +162,12 @@ func (d *Dispatcher) Fanout(ctx context.Context, fn DispatchHandler) {
 // Sends queries to all available ips at query-time and all subsequent ips when
 // they become available until Unsubscribe() is called
 func (d *Dispatcher) FanoutSubscribe(ctx context.Context, fn DispatchHandler) (*Subscription, error) {
-	ipCh := make(chan string)
+	serverCh := make(chan server)
 
-	// ip handler
-	handleNewIps := func(newIps []string) {
-		for _, ip := range newIps {
-			ipCh <- ip
+	// server handler
+	handleNewServers := func(newServers []server) {
+		for _, server := range newServers {
+			serverCh <- server
 		}
 	}
 
@@ -154,14 +177,14 @@ func (d *Dispatcher) FanoutSubscribe(ctx context.Context, fn DispatchHandler) (*
 			select {
 			case <-ctx.Done():
 				return
-			case ip, ok := <-ipCh:
+			case server, ok := <-serverCh:
 				if !ok {
 					// unsubscribe was called
 					return
 				}
 
 				// execute dispatch handler in goroutine
-				connCtx := context.WithValue(ctx, dispatcherAddrCtxKey, fmt.Sprintf("%s:%s", ip, d.connectArgs.Port))
+				connCtx := context.WithValue(ctx, dispatcherAddrCtxKey, fmt.Sprintf("%s:%s", server.ip, d.connectArgs.Port))
 				go fn(connCtx, d.conn)
 			}
 		}
@@ -169,20 +192,20 @@ func (d *Dispatcher) FanoutSubscribe(ctx context.Context, fn DispatchHandler) (*
 
 	// get current ips and subscribe to new ones in a lock
 	d.mu.Lock()
-	currentIps := d.ips.ToSlice()
-	err := d.eventbus.SubscribeAsync("add:addrs", handleNewIps, false)
+	currentServers := d.servers.ToSlice()
+	err := d.eventbus.SubscribeAsync("add:servers", handleNewServers, false)
 	if err != nil {
 		d.mu.Unlock()
 		return nil, err
 	}
 	d.mu.Unlock()
 
-	handleNewIps(currentIps)
+	handleNewServers(currentServers)
 
 	return &Subscription{
-		ipCh: ipCh,
+		serverCh: serverCh,
 		cleanup: func() {
-			d.eventbus.Unsubscribe("add:addrs", handleNewIps)
+			d.eventbus.Unsubscribe("add:servers", handleNewServers)
 		},
 	}, nil
 }
@@ -232,14 +255,14 @@ func (d *Dispatcher) Shutdown() error {
 
 // Handle add
 func (d *Dispatcher) handleAddEndpointSlice(es *discoveryv1.EndpointSlice) {
-	newIps := getIpsFromEndpointSlice(es)
-	d.updateState(newIps, nil)
+	newServers := getServersFromEndpointSlice(es)
+	d.updateState(newServers, nil)
 }
 
 // Handle updates
 func (d *Dispatcher) handleUpdateEndpointSlice(esOld *discoveryv1.EndpointSlice, esNew *discoveryv1.EndpointSlice) {
-	oldIps := mapset.NewSet(getIpsFromEndpointSlice(esOld)...)
-	newIps := mapset.NewSet(getIpsFromEndpointSlice(esNew)...)
+	oldIps := mapset.NewSet(getServersFromEndpointSlice(esOld)...)
+	newIps := mapset.NewSet(getServersFromEndpointSlice(esNew)...)
 
 	toDelete := oldIps.Difference(newIps)
 	toAdd := newIps.Difference(oldIps)
@@ -248,16 +271,16 @@ func (d *Dispatcher) handleUpdateEndpointSlice(esOld *discoveryv1.EndpointSlice,
 }
 
 // Adds and deletes ips, updates clientconn state, publishes change to eventbus
-func (d *Dispatcher) updateState(toAdd []string, toDelete []string) {
+func (d *Dispatcher) updateState(toAdd []server, toDelete []server) {
 	d.mu.Lock()
 
 	// update local state
 	if len(toDelete) > 0 {
-		d.ips.RemoveAll(toDelete...)
+		d.servers.RemoveAll(toDelete...)
 	}
 
 	if len(toAdd) > 0 {
-		d.ips.Append(toAdd...)
+		d.servers.Append(toAdd...)
 	}
 
 	// exit if no changes
@@ -267,11 +290,11 @@ func (d *Dispatcher) updateState(toAdd []string, toDelete []string) {
 	}
 
 	// update clientconn state
-	ips := d.ips.ToSlice()
+	servers := d.servers.ToSlice()
 
-	addrs := make([]resolver.Address, len(ips))
-	for i, ip := range ips {
-		addrs[i] = resolver.Address{Addr: fmt.Sprintf("%s:%s", ip, d.connectArgs.Port)}
+	addrs := make([]resolver.Address, len(servers))
+	for i, server := range servers {
+		addrs[i] = resolver.Address{Addr: fmt.Sprintf("%s:%s", server.ip, d.connectArgs.Port)}
 	}
 
 	d.resolver.UpdateState(resolver.State{Addresses: addrs})
@@ -280,7 +303,7 @@ func (d *Dispatcher) updateState(toAdd []string, toDelete []string) {
 
 	// publish change
 	if len(toAdd) > 0 {
-		d.eventbus.Publish("add:addrs", toAdd)
+		d.eventbus.Publish("add:servers", toAdd)
 	}
 }
 
@@ -353,7 +376,7 @@ func NewDispatcher(connectUrl string, options ...DispatcherOption) (*Dispatcher,
 		informer:    informer,
 		resolver:    resolver,
 		conn:        conn,
-		ips:         mapset.NewSet[string](),
+		servers:     mapset.NewSet[server](),
 		eventbus:    eventbus.New(),
 	}, nil
 }
@@ -401,12 +424,18 @@ func parseConnectUrl(connectUrl string) (*connectArgs, error) {
 	}, nil
 }
 
-func getIpsFromEndpointSlice(es *discoveryv1.EndpointSlice) []string {
-	var ips []string
+func getServersFromEndpointSlice(es *discoveryv1.EndpointSlice) []server {
+	var servers []server
 	for _, endpoint := range es.Endpoints {
 		if *endpoint.Conditions.Serving {
-			ips = append(ips, endpoint.Addresses...)
+			for _, addr := range endpoint.Addresses {
+				s := server{
+					nodeName: *endpoint.NodeName,
+					ip:       addr,
+				}
+				servers = append(servers, s)
+			}
 		}
 	}
-	return ips
+	return servers
 }

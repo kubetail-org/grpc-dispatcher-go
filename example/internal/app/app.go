@@ -92,9 +92,7 @@ func NewApp() (*App, error) {
 			}
 		}
 
-		fmt.Println(c.Query("server-name"))
-
-		app.dispatcher.Unicast(rootCtx, c.Query("server-name"), func(ctx context.Context, conn *grpc.ClientConn) {
+		app.dispatcher.Unicast(rootCtx, c.Query("node-name"), func(ctx context.Context, conn *grpc.ClientConn) {
 			// init grpc client
 			client := examplepb.NewExampleServiceClient(conn)
 
@@ -110,7 +108,6 @@ func NewApp() (*App, error) {
 		})
 
 		sendMsg("finished")
-
 	})
 
 	// handler for unicast subscribe example
@@ -131,9 +128,7 @@ func NewApp() (*App, error) {
 			}
 		}
 
-		fmt.Println(c.Query("server-name"))
-
-		sub, err := app.dispatcher.UnicastSubscribe(rootCtx, c.Query("server-name"), func(ctx context.Context, conn *grpc.ClientConn) {
+		sub, err := app.dispatcher.UnicastSubscribe(rootCtx, c.Query("node-name"), func(ctx context.Context, conn *grpc.ClientConn) {
 			// init grpc client
 			client := examplepb.NewExampleServiceClient(conn)
 

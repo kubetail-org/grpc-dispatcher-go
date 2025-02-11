@@ -21,8 +21,8 @@
     </style>
     <script>
       const runUnicastExample = (form) => {
-        const serverName = form['server-name'].value;
-        const eventSource = new EventSource(`/unicast-events?server-name=${encodeURIComponent(serverName)}`);
+        const nodeName = form['node-name'].value;
+        const eventSource = new EventSource(`/unicast-events?node-name=${encodeURIComponent(nodeName)}`);
         const output = document.getElementById('unicast-example-output');
 
         output.innerHTML = '';
@@ -45,8 +45,8 @@
       let subscriptionUnicastES;
 
       const startUnicastSubscribeExample = (form) => {
-        const serverName = form['server-name'].value;
-        subscriptionUnicastES = new EventSource(`/unicast-subscribe-events?server-name=${encodeURIComponent(serverName)}`);
+        const nodeName = form['node-name'].value;
+        subscriptionUnicastES = new EventSource(`/unicast-subscribe-events?node-name=${encodeURIComponent(nodeName)}`);
         const output = document.getElementById('unicast-subscribe-output');
 
         output.innerHTML = '';
@@ -127,13 +127,13 @@
     <h1>Example App</h1>
     <h2>Unicast Example:</h2>
     <form onsubmit="runUnicastExample(this); return false;">
-      <input type="text" name="server-name" placeholder="Server name...">
+      <input type="text" name="node-name" placeholder="Node name...">
       <button type="submit">Run</button>
     </form>
     <div id="unicast-example-output" class="output"></div>
     <h2>Unicast Subscribe Example:</h2>
     <form onsubmit="startUnicastSubscribeExample(this); return false;">
-      <input type="text" name="server-name" placeholder="Server name...">
+      <input type="text" name="node-name" placeholder="Node name...">
       <button type="submit">Start</button>
       <button type="button" onclick="stopUnicastSubscribeExample()">Stop</button>
     </form>
