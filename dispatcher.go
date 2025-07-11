@@ -64,14 +64,17 @@ type DispatchHandler func(ctx context.Context, conn *grpc.ClientConn)
 
 // Represents interest in pod ips that are part of a Kubernetes service
 type Subscription struct {
-	serverCh chan server
-	cleanup  func()
+	serverCh        chan server
+	cleanup         func()
+	unsubscribeOnce sync.Once
 }
 
 // Ends subscription
 func (sub *Subscription) Unsubscribe() {
-	close(sub.serverCh)
-	sub.cleanup()
+	sub.unsubscribeOnce.Do(func() {
+		close(sub.serverCh)
+		sub.cleanup()
+	})
 }
 
 // A Dispatcher is a utility that facilitates sending queries to multiple grpc servers
