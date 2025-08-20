@@ -19,22 +19,13 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/balancer"
-	resolver "google.golang.org/grpc/resolver"
 )
 
 type mockSubConn struct {
-	mock.Mock
+	balancer.SubConn
 }
-
-func (m *mockSubConn) UpdateAddresses([]resolver.Address) {}
-func (m *mockSubConn) Connect()                           {}
-func (m *mockSubConn) GetOrBuildProducer(b balancer.ProducerBuilder) (balancer.Producer, func()) {
-	panic("not implemented")
-}
-func (m *mockSubConn) Shutdown() {}
 
 func TestPicker_Pick(t *testing.T) {
 	subConns := map[string]balancer.SubConn{
