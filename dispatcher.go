@@ -406,8 +406,16 @@ func NewDispatcher(connectUrl string, options ...DispatcherOption) (*Dispatcher,
 	// init resolver
 	resolver := manual.NewBuilderWithScheme("kubernetes")
 
+	// Default HTTP/2 :authority for non-TLS (h2c). Place before user-provided options so
+	// user-specified WithAuthority wins.
+	defaultAuthority := fmt.Sprintf("%s.%s.svc:%s", connectArgs.ServiceName, connectArgs.Namespace, connectArgs.Port)
+
 	// init conn
-	dialOpts := append(opts.dialOpts,
+	dialOpts := []grpc.DialOption{
+		grpc.WithAuthority(defaultAuthority),
+	}
+	dialOpts = append(dialOpts, opts.dialOpts...)
+	dialOpts = append(dialOpts,
 		grpc.WithResolvers(resolver),
 		grpc.WithDefaultServiceConfig(fmt.Sprintf(`{"loadBalancingConfig": [{"%s":{}}]}`, balancerName)),
 		grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),

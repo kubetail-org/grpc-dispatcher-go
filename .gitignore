@@ -11,5 +11,8 @@
 *.sln
 *.sw?
 
+# go
+.gomodcache
+
 # tilt (custom)
 .tilt
