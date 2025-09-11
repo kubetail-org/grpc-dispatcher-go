@@ -266,3 +266,87 @@ func TestDispatcherFanoutSubscribe(t *testing.T) {
 	// check result
 	require.Equal(t, wantIps, mapset.NewSet(ips...))
 }
+
+// Exposes the race: Unsubscribe closes the internal channel, so any in-flight
+// event handler that tries to send will panic with: "send on closed channel".
+// This test models the event bus behavior by sending to the channel after
+// Unsubscribe; it should panic with the current implementation.
+// fakeEventBus lets us trigger the subscription callback even after Unsubscribe
+// to simulate an in-flight publish racing with unsubscribe.
+type fakeEventBus struct {
+	mu      sync.Mutex
+	handler func([]server)
+}
+
+func (b *fakeEventBus) Subscribe(topic string, fn interface{}) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.handler = fn.(func([]server))
+	return nil
+}
+func (b *fakeEventBus) SubscribeOnce(topic string, fn interface{}) error {
+	return b.Subscribe(topic, fn)
+}
+func (b *fakeEventBus) SubscribeAsync(topic string, fn interface{}, once bool) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	// Our code subscribes with: func([]server)
+	b.handler = fn.(func([]server))
+	return nil
+}
+func (b *fakeEventBus) SubscribeOnceAsync(topic string, fn interface{}) error {
+	return b.Subscribe(topic, fn)
+}
+func (b *fakeEventBus) Unsubscribe(topic string, fn interface{}) error { return nil }
+func (b *fakeEventBus) HasCallback(topic string) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.handler != nil
+}
+func (b *fakeEventBus) Publish(topic string, args ...interface{}) {
+	b.mu.Lock()
+	h := b.handler
+	b.mu.Unlock()
+	if h != nil {
+		h(args[0].([]server))
+	}
+}
+func (b *fakeEventBus) WaitAsync() {}
+
+func TestUnicastSubscribe_UnsubscribeThenPublishDoesNotPanic(t *testing.T) {
+	// initialize dispatcher with fake bus to control callback timing
+	d := newTestDispatcher()
+	fb := &fakeEventBus{}
+	d.eventbus = fb
+
+	// start a subscription
+	sub, err := d.UnicastSubscribe(context.Background(), "n1", func(ctx context.Context, clientconn *grpc.ClientConn) {})
+	require.Nil(t, err)
+
+	// Unsubscribe; publishing should not panic even if handler runs
+	sub.Unsubscribe()
+
+	// Simulate an in-flight publish that still calls the handler
+	require.NotPanics(t, func() {
+		fb.Publish("add:servers", []server{{ip: "1.2.3.4", nodeName: "n1"}})
+	})
+}
+
+func TestFanoutSubscribe_UnsubscribeThenPublishDoesNotPanic(t *testing.T) {
+	// initialize dispatcher with fake bus to control callback timing
+	d := newTestDispatcher()
+	fb := &fakeEventBus{}
+	d.eventbus = fb
+
+	// start a subscription
+	sub, err := d.FanoutSubscribe(context.Background(), func(ctx context.Context, clientconn *grpc.ClientConn) {})
+	require.Nil(t, err)
+
+	// Unsubscribe; publishing should not panic even if handler runs
+	sub.Unsubscribe()
+
+	// Simulate an in-flight publish that still calls the handler
+	require.NotPanics(t, func() {
+		fb.Publish("add:servers", []server{{ip: "1.2.3.4", nodeName: "n1"}})
+	})
+}
