@@ -67,13 +67,15 @@ type Subscription struct {
 	serverCh        chan server
 	cleanup         func()
 	unsubscribeOnce sync.Once
+	done            chan struct{}
 }
 
 // Ends subscription
 func (sub *Subscription) Unsubscribe() {
 	sub.unsubscribeOnce.Do(func() {
-		close(sub.serverCh)
+		// First, stop receiving new events, then signal worker shutdown.
 		sub.cleanup()
+		close(sub.done)
 	})
 }
 
@@ -130,12 +132,17 @@ func (d *Dispatcher) Unicast(ctx context.Context, nodeName string, fn DispatchHa
 // they become available until Unsubscribe() is called
 func (d *Dispatcher) UnicastSubscribe(ctx context.Context, nodeName string, fn DispatchHandler) (*Subscription, error) {
 	serverCh := make(chan server)
+	done := make(chan struct{})
 
 	// server handler
 	handleNewServers := func(newServers []server) {
 		for _, server := range newServers {
 			if server.nodeName == nodeName {
-				serverCh <- server
+				select {
+				case <-done:
+					return
+				case serverCh <- server:
+				}
 			}
 		}
 	}
@@ -144,14 +151,9 @@ func (d *Dispatcher) UnicastSubscribe(ctx context.Context, nodeName string, fn D
 	go func() {
 		for {
 			select {
-			case <-ctx.Done():
+			case <-done:
 				return
-			case server, ok := <-serverCh:
-				if !ok {
-					// unsubscribe was called
-					return
-				}
-
+			case server := <-serverCh:
 				// execute dispatch handler in goroutine
 				connCtx := context.WithValue(ctx, dispatcherAddrCtxKey, fmt.Sprintf("%s:%s", server.ip, d.connectArgs.Port))
 				go fn(connCtx, d.conn)
@@ -176,6 +178,7 @@ func (d *Dispatcher) UnicastSubscribe(ctx context.Context, nodeName string, fn D
 		cleanup: func() {
 			d.eventbus.Unsubscribe("add:servers", handleNewServers)
 		},
+		done: done,
 	}, nil
 }
 
@@ -213,11 +216,16 @@ func (d *Dispatcher) Fanout(ctx context.Context, fn DispatchHandler) {
 // they become available until Unsubscribe() is called
 func (d *Dispatcher) FanoutSubscribe(ctx context.Context, fn DispatchHandler) (*Subscription, error) {
 	serverCh := make(chan server)
+	done := make(chan struct{})
 
 	// server handler
 	handleNewServers := func(newServers []server) {
 		for _, server := range newServers {
-			serverCh <- server
+			select {
+			case <-done:
+				return
+			case serverCh <- server:
+			}
 		}
 	}
 
@@ -225,14 +233,9 @@ func (d *Dispatcher) FanoutSubscribe(ctx context.Context, fn DispatchHandler) (*
 	go func() {
 		for {
 			select {
-			case <-ctx.Done():
+			case <-done:
 				return
-			case server, ok := <-serverCh:
-				if !ok {
-					// unsubscribe was called
-					return
-				}
-
+			case server := <-serverCh:
 				// execute dispatch handler in goroutine
 				connCtx := context.WithValue(ctx, dispatcherAddrCtxKey, fmt.Sprintf("%s:%s", server.ip, d.connectArgs.Port))
 				go fn(connCtx, d.conn)
@@ -257,6 +260,7 @@ func (d *Dispatcher) FanoutSubscribe(ctx context.Context, fn DispatchHandler) (*
 		cleanup: func() {
 			d.eventbus.Unsubscribe("add:servers", handleNewServers)
 		},
+		done: done,
 	}, nil
 }
 
