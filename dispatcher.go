@@ -301,14 +301,18 @@ func (d *Dispatcher) Start() {
 
 	// add event handler
 	reg, _ := d.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+		AddFunc: func(obj any) {
 			es := obj.(*discoveryv1.EndpointSlice)
 			d.handleAddEndpointSlice(es)
 		},
-		UpdateFunc: func(oldObj interface{}, newObj interface{}) {
+		UpdateFunc: func(oldObj any, newObj any) {
 			esOld := oldObj.(*discoveryv1.EndpointSlice)
 			esNew := newObj.(*discoveryv1.EndpointSlice)
 			d.handleUpdateEndpointSlice(esOld, esNew)
+		},
+		DeleteFunc: func(obj any) {
+			es := obj.(*discoveryv1.EndpointSlice)
+			d.handleDeleteEndpointSlice(es)
 		},
 	})
 	d.informerReg = reg
@@ -352,6 +356,12 @@ func (d *Dispatcher) handleUpdateEndpointSlice(esOld *discoveryv1.EndpointSlice,
 	d.updateState(toAdd.ToSlice(), toDelete.ToSlice())
 }
 
+// Handle delete
+func (d *Dispatcher) handleDeleteEndpointSlice(es *discoveryv1.EndpointSlice) {
+	toDelete := getServersFromEndpointSlice(es)
+	d.updateState(nil, toDelete)
+}
+
 // Adds and deletes ips, updates clientconn state, publishes change to eventbus
 func (d *Dispatcher) updateState(toAdd []server, toDelete []server) {
 	d.mu.Lock()
@@ -378,7 +388,6 @@ func (d *Dispatcher) updateState(toAdd []server, toDelete []server) {
 	for i, server := range servers {
 		addrs[i] = resolver.Address{Addr: fmt.Sprintf("%s:%s", server.ip, d.connectArgs.Port)}
 	}
-
 	d.resolver.UpdateState(resolver.State{Addresses: addrs})
 
 	d.mu.Unlock()
