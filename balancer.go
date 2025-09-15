@@ -15,8 +15,6 @@
 package grpcdispatcher
 
 import (
-	"fmt"
-
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/balancer/base"
 )
@@ -30,7 +28,9 @@ func (p *picker) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
 	wantIp := info.Ctx.Value(dispatcherAddrCtxKey).(string)
 	sc, exists := p.subConns[wantIp]
 	if !exists {
-		return balancer.PickResult{}, fmt.Errorf("subconn for ip %s not ready", wantIp)
+		// Signal to gRPC that no SubConn is currently available so it can
+		// honor WaitForReady semantics and wait for readiness.
+		return balancer.PickResult{}, balancer.ErrNoSubConnAvailable
 	}
 	return balancer.PickResult{SubConn: sc}, nil
 }
