@@ -16,7 +16,6 @@ package grpcdispatcher
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -50,7 +49,7 @@ func TestPicker_Pick(t *testing.T) {
 		{
 			name:        "SubConn does not exist for IP",
 			ctxValue:    "192.168.1.3",
-			expectedErr: errors.New("subconn for ip 192.168.1.3 not ready"),
+			expectedErr: balancer.ErrNoSubConnAvailable,
 		},
 	}
 
