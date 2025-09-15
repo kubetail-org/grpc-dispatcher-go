@@ -182,6 +182,34 @@ func (d *Dispatcher) UnicastSubscribe(ctx context.Context, nodeName string, fn D
 	}, nil
 }
 
+// Sends query to matching server at query-time if available or waits until
+// it becomes available or context is canceled. Only connects once.
+func (d *Dispatcher) UnicastSubscribeOnce(ctx context.Context, nodeName string, fn DispatchHandler) error {
+	var callOnce sync.Once
+	done := make(chan struct{})
+
+	sub, err := d.UnicastSubscribe(ctx, nodeName, func(hctx context.Context, conn *grpc.ClientConn) {
+		callOnce.Do(func() {
+			fn(hctx, conn)
+			close(done)
+		})
+	})
+	if err != nil {
+		return err
+	}
+
+	// Unsubscribe when the first invocation happens or the context is canceled
+	go func() {
+		select {
+		case <-done:
+		case <-ctx.Done():
+		}
+		sub.Unsubscribe()
+	}()
+
+	return nil
+}
+
 // Sends queries to all available ips at query-time
 func (d *Dispatcher) Fanout(ctx context.Context, fn DispatchHandler) {
 	var wg sync.WaitGroup
