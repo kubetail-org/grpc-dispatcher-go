@@ -92,6 +92,26 @@ func main() {
   }
   defer unicastSub.Unsubscribe()
 
+  // send query to one grpc server once
+  err := dispatcher.UnicastSubscribeOnce(rootCtx, "node-name", func(ctx context.Context, conn *grpc.ClientConn) error {
+    // init grpc client
+    client := examplepb.NewExampleServiceClient(conn)
+
+    // execute grpc request
+    resp, err := client.Echo(ctx, &examplepb.EchoRequest{Message: "hello"})
+    if err != nil {
+      // do something with error
+      fmt.Println(err)
+      return
+    }
+
+    // do something with response
+    fmt.Println(resp)
+  })
+  if err != nil {
+    panic(err)
+  }
+
   // send query to all current grpc servers
   dispatcher.Fanout(rootCtx, func(ctx context.Context, conn *grpc.ClientConn) {
     // init grpc client

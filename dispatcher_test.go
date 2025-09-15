@@ -17,7 +17,9 @@ package grpcdispatcher
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/stretchr/testify/require"
@@ -195,6 +197,31 @@ func TestDispatcherUnicastSubscribe(t *testing.T) {
 
 	// check result
 	require.Equal(t, wantIps, mapset.NewSet(ips...))
+}
+
+func TestDispatcherUnicastSubscribeOnce(t *testing.T) {
+	// initialize dispatcher
+	d := newTestDispatcher()
+
+	// start with one matching server
+	d.updateState([]server{{"ip1A", "n1"}}, nil)
+
+	var calls int32
+	err := d.UnicastSubscribeOnce(context.Background(), "n1", func(ctx context.Context, clientconn *grpc.ClientConn) {
+		atomic.AddInt32(&calls, 1)
+	})
+	require.Nil(t, err)
+
+	// wait for the first (and only) invocation
+	require.Eventually(t, func() bool { return atomic.LoadInt32(&calls) == 1 }, time.Second, 10*time.Millisecond)
+
+	// add another matching server; should not trigger again
+	d.updateState([]server{{"ip1B", "n1"}}, nil)
+
+	// small delay to surface any erroneous second call
+	time.Sleep(50 * time.Millisecond)
+
+	require.Equal(t, int32(1), atomic.LoadInt32(&calls))
 }
 
 func TestDispatcherFanout(t *testing.T) {
