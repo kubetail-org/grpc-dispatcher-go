@@ -518,14 +518,20 @@ func parseConnectUrl(connectUrl string) (*connectArgs, error) {
 func getServersFromEndpointSlice(es *discoveryv1.EndpointSlice) []server {
 	var servers []server
 	for _, endpoint := range es.Endpoints {
-		if *endpoint.Conditions.Serving {
-			for _, addr := range endpoint.Addresses {
-				s := server{
-					nodeName: *endpoint.NodeName,
-					ip:       addr,
-				}
-				servers = append(servers, s)
-			}
+		// Serving was added as alpha in 1.20 and may be nil in some 1.21 clusters; fall back to Ready.
+		serving := endpoint.Conditions.Serving
+		if serving == nil {
+			serving = endpoint.Conditions.Ready
+		}
+		if serving == nil || !*serving {
+			continue
+		}
+		nodeName := ""
+		if endpoint.NodeName != nil {
+			nodeName = *endpoint.NodeName
+		}
+		for _, addr := range endpoint.Addresses {
+			servers = append(servers, server{nodeName: nodeName, ip: addr})
 		}
 	}
 	return servers

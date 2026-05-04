@@ -185,3 +185,24 @@ To teardown the dev environment run these commands:
 tilt down
 ctlptl delete -f hack/ctlptl/minikube.yaml
 ```
+
+## Integration tests
+
+The integration tests in `integration_test.go` run against a real Kubernetes apiserver to verify EndpointSlice handling across supported Kubernetes versions (1.21+). They are gated behind the `integration` build tag so the default `go test ./...` skips them.
+
+CI runs them automatically against a kind cluster matrix. To run them locally against a specific Kubernetes version:
+
+```console
+# 1. Bring up a kind cluster pinned to the version you want to test against.
+#    See https://hub.docker.com/r/kindest/node/tags for available image tags.
+kind create cluster --image kindest/node:v1.30.4 --name dispatcher-it
+
+# 2. Run the integration tests (KUBECONFIG must point at the kind cluster).
+KUBECONFIG=$(kind get kubeconfig-path --name dispatcher-it 2>/dev/null || echo ~/.kube/config) \
+  go test -tags=integration -race -v -timeout=5m ./...
+
+# 3. Teardown when done.
+kind delete cluster --name dispatcher-it
+```
+
+To sweep multiple versions locally, repeat with different `--image` tags. The CI matrix in `.github/workflows/ci.yml` is the source of truth for which versions are tested on every PR.

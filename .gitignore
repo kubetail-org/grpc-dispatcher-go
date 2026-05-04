@@ -13,3 +13,21 @@
 
 # tilt (custom)
 .tilt
+
+# AI tools
+.aider/
+.cache/
+.claude/*
+.cody/
+.continue/
+.cursor/
+.embeddings/
+.memory/
+.sweep/
+
+# Allow Claude Skills
+!.claude/skills/
+
+# Misc
+.worktrees
+.sbx
